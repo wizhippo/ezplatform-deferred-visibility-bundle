@@ -1,0 +1,14 @@
+<?php
+
+$kernelDir = __DIR__ . '/vendor/ezsystems/ezpublish-kernel';
+
+return array(
+    // The installation directory
+    'install_dir' => $kernelDir,
+
+    // Path to the containerBuilder.php file used by service container
+    'container_builder_path' => $kernelDir . '/eZ/Publish/Core/settings/containerBuilder.php',
+
+    // The cache directory
+    'cache_dir' => $kernelDir . '/var/cache',
+);
