@@ -170,9 +170,11 @@ class DeferredVisibilityService
             ])
         ]);
 
-        $searchResults = $this->searchService->findContent($query);
-        foreach ($searchResults->searchHits as $searchHit) {
-            $this->updateContentState($searchHit->valueObject, $now);
-        }
+        do {
+            $searchResults = $this->searchService->findContent($query);
+            foreach ($searchResults->searchHits as $searchHit) {
+                $this->updateContentState($searchHit->valueObject, $now);
+            }
+        } while($query->offset += $query->limit < $searchResults->totalCount);
     }
 }
