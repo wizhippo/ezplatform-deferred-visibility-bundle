@@ -2,9 +2,7 @@ services:
     wizhippo_deferred_visibility_bundle.service.deferred_visibility:
         class: Wizhippo\Bundle\DeferredVisibilityBundle\Service\DeferredVisibilityService
         arguments:
-            - "@ezpublish.api.service.location"
-            - "@ezpublish.api.service.object_state"
-            - "@ezpublish.api.service.search"
+            - "@ezpublish.api.repository"
             - "@wizhippo_deferred_visibility_bundle.object_state"
             - "%wizhippo_deferred_visibility_bundle.supported_type_ids%"
 

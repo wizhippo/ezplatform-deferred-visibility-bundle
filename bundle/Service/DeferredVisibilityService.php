@@ -2,9 +2,7 @@
 
 namespace Wizhippo\Bundle\DeferredVisibilityBundle\Service;
 
-use eZ\Publish\API\Repository\LocationService;
-use eZ\Publish\API\Repository\ObjectStateService;
-use eZ\Publish\API\Repository\SearchService;
+use eZ\Publish\API\Repository\Repository;
 use eZ\Publish\API\Repository\Values\Content\Content;
 use eZ\Publish\API\Repository\Values\Content\Query;
 use eZ\Publish\API\Repository\Values\Content\Query\Criterion\Operator;
@@ -23,19 +21,9 @@ class DeferredVisibilityService
     const FIELD_EXPIRE_VISIBILITY_DATE = "expire_visibility_date";
 
     /**
-     * @var \eZ\Publish\API\Repository\LocationService
+     * @var \eZ\Publish\API\Repository\Repository
      */
-    private $locationService;
-
-    /**
-     * @var \eZ\Publish\API\Repository\ObjectStateService
-     */
-    private $objectStateService;
-
-    /**
-     * @var \eZ\Publish\API\Repository\SearchService
-     */
-    private $searchService;
+    private $repository;
 
     /**
      * @var \Wizhippo\Bundle\DeferredVisibilityBundle\Helper\ObjectStateHelper
@@ -48,23 +36,17 @@ class DeferredVisibilityService
     private $supportedTypeIds;
 
     /**
-     * DeferredPublishService constructor.
-     * @param \eZ\Publish\API\Repository\LocationService $locationService
-     * @param \eZ\Publish\API\Repository\ObjectStateService $objectStateService
-     * @param SearchService $searchService
+     * DeferredVisibilityService constructor.
+     * @param Repository $repository
      * @param ObjectStateHelper $objectStateHelper
-     * @param \int[] $supportedTypeIds
+     * @param array $supportedTypeIds
      */
     public function __construct(
-        LocationService $locationService,
-        ObjectStateService $objectStateService,
-        SearchService $searchService,
+        Repository $repository,
         ObjectStateHelper $objectStateHelper,
         array $supportedTypeIds
     ) {
-        $this->locationService = $locationService;
-        $this->objectStateService = $objectStateService;
-        $this->searchService = $searchService;
+        $this->repository = $repository;
         $this->objectStateHelper = $objectStateHelper;
         $this->supportedTypeIds = $supportedTypeIds;
     }
@@ -75,106 +57,125 @@ class DeferredVisibilityService
             return;
         }
 
-        $now = ($now !== null) ? $now : new \DateTime();
+        $this->repository->sudo(
+            function (Repository $repo) use ($content, $now) {
+                $locationService = $repo->getLocationService();
+                $objectStateService = $repo->getObjectStateService();
+                
+                $now = ($now !== null) ? $now : new \DateTime();
 
-        $locations = $this->locationService->loadLocations($content->contentInfo);
-        $objectStateGroup = $this->objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
+                $locations = $locationService->loadLocations($content->contentInfo);
+                $objectStateGroup = $this->objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
 
-        $expiryDateField = $content->getField(self::FIELD_EXPIRE_VISIBILITY_DATE);
-        $expiryDate = $expiryDateField !== null ? $expiryDateField->value->value : null;
+                $expiryDateField = $content->getField(self::FIELD_EXPIRE_VISIBILITY_DATE);
+                $expiryDate = $expiryDateField !== null ? $expiryDateField->value->value : null;
 
-        $visibleDateField = $content->getField(self::FIELD_DEFER_VISIBILITY_DATE);
-        $visibleDate = $visibleDateField !== null ? $visibleDateField->value->value : null;
+                $visibleDateField = $content->getField(self::FIELD_DEFER_VISIBILITY_DATE);
+                $visibleDate = $visibleDateField !== null ? $visibleDateField->value->value : null;
 
-        if ($expiryDate !== null && $expiryDate <= $now) {
-            foreach ($locations as $location) {
-                if (!$location->hidden) {
-                    $this->locationService->hideLocation($location);
+                if ($expiryDate !== null && $expiryDate <= $now) {
+                    foreach ($locations as $location) {
+                        if (!$location->hidden) {
+                            $locationService->hideLocation($location);
+                        }
+                    }
+                    $expiredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                        $objectStateGroup,
+                        self::OBJECT_STATE_EXPIRED
+                    );
+                    $objectStateService->setContentState(
+                        $content->contentInfo,
+                        $objectStateGroup,
+                        $expiredObjectState
+                    );
+                    return;
                 }
-            }
-            $expiredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
-                $objectStateGroup,
-                self::OBJECT_STATE_EXPIRED
-            );
-            $this->objectStateService->setContentState(
-                $content->contentInfo,
-                $objectStateGroup,
-                $expiredObjectState
-            );
-            return;
-        }
 
-        if ($visibleDate !== null && $visibleDate > $now) {
-            foreach ($locations as $location) {
-                if (!$location->hidden) {
-                    $this->locationService->hideLocation($location);
+                if ($visibleDate !== null && $visibleDate > $now) {
+                    foreach ($locations as $location) {
+                        if (!$location->hidden) {
+                            $locationService->hideLocation($location);
+                        }
+                    }
+                    $deferredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                        $objectStateGroup,
+                        self::OBJECT_STATE_DEFERRED
+                    );
+                    $objectStateService->setContentState(
+                        $content->contentInfo,
+                        $objectStateGroup,
+                        $deferredObjectState
+                    );
+                    return;
                 }
-            }
-            $deferredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
-                $objectStateGroup,
-                self::OBJECT_STATE_DEFERRED
-            );
-            $this->objectStateService->setContentState(
-                $content->contentInfo,
-                $objectStateGroup,
-                $deferredObjectState
-            );
-            return;
-        }
 
-        foreach ($locations as $location) {
-            if ($location->hidden) {
-                $this->locationService->unhideLocation($location);
+                foreach ($locations as $location) {
+                    if ($location->hidden) {
+                        $locationService->unhideLocation($location);
+                    }
+                }
+                $visibleObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                    $objectStateGroup,
+                    self::OBJECT_STATE_VISIBLE
+                );
+                $objectStateService->setContentState(
+                    $content->contentInfo,
+                    $objectStateGroup,
+                    $visibleObjectState
+                );
             }
-        }
-        $visibleObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
-            $objectStateGroup,
-            self::OBJECT_STATE_VISIBLE
-        );
-        $this->objectStateService->setContentState(
-            $content->contentInfo,
-            $objectStateGroup,
-            $visibleObjectState
         );
     }
 
     public function updateContentStatePeriodic($now = null)
     {
-        $now = ($now !== null) ? $now : new \DateTime();
+        $this->repository->sudo(
+            function (Repository $repo) use ($now) {
+                $searchService = $repo->getSearchService();
 
-        $objectStateGroup = $this->objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
-        $deferredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
-            $objectStateGroup,
-            self::OBJECT_STATE_DEFERRED
-        );
-        $visibleObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
-            $objectStateGroup,
-            self::OBJECT_STATE_VISIBLE
-        );
+                $now = ($now !== null) ? $now : new \DateTime();
 
-        $query = new Query();
-        $query->query = new Query\Criterion\LogicalOr([
-            new Query\Criterion\LogicalAnd([
-                new Query\Criterion\ObjectStateId($deferredObjectState->id),
-                new Query\Criterion\LogicalNot(new Query\Criterion\Field(self::FIELD_DEFER_VISIBILITY_DATE,
-                    Operator::EQ, '')),
-                new Query\Criterion\Field(self::FIELD_DEFER_VISIBILITY_DATE, Operator::LTE, $now->getTimestamp()),
-                new Query\Criterion\ContentTypeId($this->supportedTypeIds),
-            ]),
-            new Query\Criterion\LogicalAnd([
-                new Query\Criterion\ObjectStateId($visibleObjectState->id),
-                new Query\Criterion\LogicalNot(new Query\Criterion\Field(self::FIELD_EXPIRE_VISIBILITY_DATE,
-                    Operator::EQ, '')),
-                new Query\Criterion\Field(self::FIELD_EXPIRE_VISIBILITY_DATE, Operator::LTE, $now->getTimestamp()),
-                new Query\Criterion\ContentTypeId($this->supportedTypeIds),
-            ])
-        ]);
+                $objectStateGroup = $this->objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
+                $deferredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                    $objectStateGroup,
+                    self::OBJECT_STATE_DEFERRED
+                );
+                $visibleObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                    $objectStateGroup,
+                    self::OBJECT_STATE_VISIBLE
+                );
 
-        do {
-            $searchResults = $this->searchService->findContent($query);
-            foreach ($searchResults->searchHits as $searchHit) {
-                $this->updateContentState($searchHit->valueObject, $now);
+                $query = new Query();
+                $query->query = new Query\Criterion\LogicalOr([
+                    new Query\Criterion\LogicalAnd([
+                        new Query\Criterion\ObjectStateId($deferredObjectState->id),
+                        new Query\Criterion\LogicalNot(new Query\Criterion\Field(
+                            self::FIELD_DEFER_VISIBILITY_DATE,
+                            Operator::EQ,
+                            ''
+                        )),
+                        new Query\Criterion\Field(self::FIELD_DEFER_VISIBILITY_DATE, Operator::LTE, $now->getTimestamp()),
+                        new Query\Criterion\ContentTypeId($this->supportedTypeIds),
+                    ]),
+                    new Query\Criterion\LogicalAnd([
+                        new Query\Criterion\ObjectStateId($visibleObjectState->id),
+                        new Query\Criterion\LogicalNot(new Query\Criterion\Field(
+                            self::FIELD_EXPIRE_VISIBILITY_DATE,
+                            Operator::EQ,
+                            ''
+                        )),
+                        new Query\Criterion\Field(self::FIELD_EXPIRE_VISIBILITY_DATE, Operator::LTE, $now->getTimestamp()),
+                        new Query\Criterion\ContentTypeId($this->supportedTypeIds),
+                    ])
+                ]);
+
+                do {
+                    $searchResults = $searchService->findContent($query);
+                    foreach ($searchResults->searchHits as $searchHit) {
+                        $this->updateContentState($searchHit->valueObject, $now);
+                    }
+                } while ($query->offset += $query->limit < $searchResults->totalCount);
             }
-        } while($query->offset += $query->limit < $searchResults->totalCount);
+        );
     }
 }
