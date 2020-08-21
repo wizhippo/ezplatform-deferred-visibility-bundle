@@ -1,6 +1,8 @@
 <?php
 
-namespace Wizhippo\Bundle\DeferredVisibilityBundle\Helper;
+declare(strict_types=1);
+
+namespace Wizhippo\WizhippoDeferredVisibilityBundle\Helper;
 
 use eZ\Publish\API\Repository\ObjectStateService;
 use eZ\Publish\Core\Base\Exceptions\NotFoundException;
@@ -14,6 +16,7 @@ class ObjectStateHelper
 
     /**
      * ObjectStateHelper constructor.
+     *
      * @param ObjectStateService $objectStateService
      */
     public function __construct(ObjectStateService $objectStateService)

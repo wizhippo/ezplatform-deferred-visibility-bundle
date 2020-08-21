@@ -1,6 +1,8 @@
 <?php
 
-namespace Wizhippo\Bundle\DeferredVisibilityBundle\DependencyInjection;
+declare(strict_types=1);
+
+namespace Wizhippo\WizhippoDeferredVisibilityBundle\DependencyInjection;
 
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;

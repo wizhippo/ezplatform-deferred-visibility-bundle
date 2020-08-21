@@ -1,17 +1,13 @@
 services:
-    wizhippo_deferred_visibility_bundle.service.deferred_visibility:
-        class: Wizhippo\Bundle\DeferredVisibilityBundle\Service\DeferredVisibilityService
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    Wizhippo\WizhippoDeferredVisibilityBundle\:
+        resource: '../../*'
+        exclude: '../../{DependencyInjection,Entity,Migrations}'
+
+    Wizhippo\WizhippoDeferredVisibilityBundle\Service\DeferredVisibilityService:
         arguments:
-            - "@ezpublish.api.repository"
-            - "@wizhippo_deferred_visibility_bundle.object_state"
-            - "%wizhippo_deferred_visibility_bundle.supported_type_ids%"
-
-    wizhippo_deferred_visibility_bundle.object_state:
-        class: Wizhippo\Bundle\DeferredVisibilityBundle\Helper\ObjectStateHelper
-        arguments: ["@ezpublish.api.service.object_state"]
-
-    wizhippo_deferred_visibility_bundle.on_publish_slot:
-        class: Wizhippo\Bundle\DeferredVisibilityBundle\Core\SignalSlot\DeferVisibilityOnPublishSlot
-        arguments: ["@ezpublish.api.service.content", "@wizhippo_deferred_visibility_bundle.service.deferred_visibility"]
-        tags:
-            - {name: ezpublish.api.slot, signal: ContentService\PublishVersionSignal}
+            $supportedTypeIds: '%wizhippo_deferred_visibility_bundle.supported_type_ids%'

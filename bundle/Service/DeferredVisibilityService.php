@@ -1,12 +1,14 @@
 <?php
 
-namespace Wizhippo\Bundle\DeferredVisibilityBundle\Service;
+declare(strict_types=1);
+
+namespace Wizhippo\WizhippoDeferredVisibilityBundle\Service;
 
 use eZ\Publish\API\Repository\Repository;
 use eZ\Publish\API\Repository\Values\Content\Content;
 use eZ\Publish\API\Repository\Values\Content\Query;
 use eZ\Publish\API\Repository\Values\Content\Query\Criterion\Operator;
-use Wizhippo\Bundle\DeferredVisibilityBundle\Helper\ObjectStateHelper;
+use Wizhippo\WizhippoDeferredVisibilityBundle\Helper\ObjectStateHelper;
 
 class DeferredVisibilityService
 {
@@ -26,28 +28,16 @@ class DeferredVisibilityService
     private $repository;
 
     /**
-     * @var \Wizhippo\Bundle\DeferredVisibilityBundle\Helper\ObjectStateHelper
-     */
-    private $objectStateHelper;
-
-    /**
      * @var int[]
      */
     private $supportedTypeIds;
 
-    /**
-     * DeferredVisibilityService constructor.
-     * @param Repository $repository
-     * @param ObjectStateHelper $objectStateHelper
-     * @param array $supportedTypeIds
-     */
     public function __construct(
         Repository $repository,
-        ObjectStateHelper $objectStateHelper,
         array $supportedTypeIds
-    ) {
+    )
+    {
         $this->repository = $repository;
-        $this->objectStateHelper = $objectStateHelper;
         $this->supportedTypeIds = $supportedTypeIds;
     }
 
@@ -61,11 +51,12 @@ class DeferredVisibilityService
             function (Repository $repo) use ($content, $now) {
                 $locationService = $repo->getLocationService();
                 $objectStateService = $repo->getObjectStateService();
-                
+                $objectStateHelper = new ObjectStateHelper($objectStateService);
+
                 $now = ($now !== null) ? $now : new \DateTime();
 
                 $locations = $locationService->loadLocations($content->contentInfo);
-                $objectStateGroup = $this->objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
+                $objectStateGroup = $objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
 
                 $expiryDateField = $content->getField(self::FIELD_EXPIRE_VISIBILITY_DATE);
                 $expiryDate = $expiryDateField !== null ? $expiryDateField->value->value : null;
@@ -79,7 +70,7 @@ class DeferredVisibilityService
                             $locationService->hideLocation($location);
                         }
                     }
-                    $expiredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                    $expiredObjectState = $objectStateHelper->loadObjectStateByIdentifier(
                         $objectStateGroup,
                         self::OBJECT_STATE_EXPIRED
                     );
@@ -88,6 +79,7 @@ class DeferredVisibilityService
                         $objectStateGroup,
                         $expiredObjectState
                     );
+
                     return;
                 }
 
@@ -97,7 +89,7 @@ class DeferredVisibilityService
                             $locationService->hideLocation($location);
                         }
                     }
-                    $deferredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                    $deferredObjectState = $objectStateHelper->loadObjectStateByIdentifier(
                         $objectStateGroup,
                         self::OBJECT_STATE_DEFERRED
                     );
@@ -106,6 +98,7 @@ class DeferredVisibilityService
                         $objectStateGroup,
                         $deferredObjectState
                     );
+
                     return;
                 }
 
@@ -114,7 +107,7 @@ class DeferredVisibilityService
                         $locationService->unhideLocation($location);
                     }
                 }
-                $visibleObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                $visibleObjectState = $objectStateHelper->loadObjectStateByIdentifier(
                     $objectStateGroup,
                     self::OBJECT_STATE_VISIBLE
                 );
@@ -132,15 +125,16 @@ class DeferredVisibilityService
         $this->repository->sudo(
             function (Repository $repo) use ($now) {
                 $searchService = $repo->getSearchService();
+                $objectStateHelper = new ObjectStateHelper($repo->getObjectStateService());
 
                 $now = ($now !== null) ? $now : new \DateTime();
 
-                $objectStateGroup = $this->objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
-                $deferredObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                $objectStateGroup = $objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
+                $deferredObjectState = $objectStateHelper->loadObjectStateByIdentifier(
                     $objectStateGroup,
                     self::OBJECT_STATE_DEFERRED
                 );
-                $visibleObjectState = $this->objectStateHelper->loadObjectStateByIdentifier(
+                $visibleObjectState = $objectStateHelper->loadObjectStateByIdentifier(
                     $objectStateGroup,
                     self::OBJECT_STATE_VISIBLE
                 );
@@ -154,7 +148,8 @@ class DeferredVisibilityService
                             Operator::EQ,
                             ''
                         )),
-                        new Query\Criterion\Field(self::FIELD_DEFER_VISIBILITY_DATE, Operator::LTE, $now->getTimestamp()),
+                        new Query\Criterion\Field(self::FIELD_DEFER_VISIBILITY_DATE, Operator::LTE,
+                            $now->getTimestamp()),
                         new Query\Criterion\ContentTypeId($this->supportedTypeIds),
                     ]),
                     new Query\Criterion\LogicalAnd([
@@ -164,7 +159,8 @@ class DeferredVisibilityService
                             Operator::EQ,
                             ''
                         )),
-                        new Query\Criterion\Field(self::FIELD_EXPIRE_VISIBILITY_DATE, Operator::LTE, $now->getTimestamp()),
+                        new Query\Criterion\Field(self::FIELD_EXPIRE_VISIBILITY_DATE, Operator::LTE,
+                            $now->getTimestamp()),
                         new Query\Criterion\ContentTypeId($this->supportedTypeIds),
                     ])
                 ]);

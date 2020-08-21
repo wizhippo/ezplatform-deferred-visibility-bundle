@@ -1,17 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<phpunit bootstrap="./bootstrap.php"
+<phpunit bootstrap="./tests/bootstrap.php"
          colors="true"
          convertErrorsToExceptions="true"
          convertNoticesToExceptions="true"
-         convertWarningsToExceptions="true"
-         syntaxCheck="true">
+         convertWarningsToExceptions="true">
     <php>
         <ini name="error_reporting" value="-1"/>
         <env name="setupFactory" value="eZ\Publish\API\Repository\Tests\SetupFactory\Legacy"/>
     </php>
     <testsuites>
-        <testsuite name="Wizhippo\Bundle\DeferredVisibilityBundle">
-            <directory>./tests</directory>
+        <testsuite name="Unit tests">
+            <directory suffix="Test.php">./tests/bundle/</directory>
         </testsuite>
     </testsuites>
     <filter>

@@ -1,25 +1,33 @@
 <?php
 
-namespace Wizhippo\Bundle\DeferredVisibilityBundle\Command;
+declare(strict_types=1);
 
-use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+namespace Wizhippo\WizhippoDeferredVisibilityBundle\Command;
+
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Wizhippo\WizhippoDeferredVisibilityBundle\Service\DeferredVisibilityService;
 
-class DeferredVisibilityCronCommand extends ContainerAwareCommand
+class DeferredVisibilityCronCommand extends Command
 {
-    protected function configure()
+    static $defaultName = 'deferred-visibility:cron';
+
+    /**
+     * @var \Wizhippo\WizhippoDeferredVisibilityBundle\Service\DeferredVisibilityService
+     */
+    private $deferredVisibilityService;
+
+    public function __construct(DeferredVisibilityService $deferredVisibilityService)
     {
-        $this->setName("deferred-visibility:cron");
+        parent::__construct();
+        $this->deferredVisibilityService = $deferredVisibilityService;
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $repository = $this->getContainer()->get("ezpublish.api.repository");
-        $user = $repository->getUserService()->loadUser(14);
-        $repository->setCurrentUser($user);
+        $this->deferredVisibilityService->updateContentStatePeriodic();
 
-        $deferredPublishService = $this->getContainer()->get("wizhippo_deferred_visibility_bundle.service.deferred_visibility");
-        $deferredPublishService->updateContentStatePeriodic();
+        return self::SUCCESS;
     }
 }

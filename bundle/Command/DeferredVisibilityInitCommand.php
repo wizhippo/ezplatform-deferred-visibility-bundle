@@ -1,78 +1,98 @@
 <?php
 
-namespace Wizhippo\Bundle\DeferredVisibilityBundle\Command;
+declare(strict_types=1);
+
+namespace Wizhippo\WizhippoDeferredVisibilityBundle\Command;
 
 use eZ\Publish\API\Repository\Exceptions\NotFoundException;
+use eZ\Publish\API\Repository\Repository;
 use eZ\Publish\API\Repository\Values\ObjectState\ObjectStateCreateStruct;
 use eZ\Publish\API\Repository\Values\ObjectState\ObjectStateGroupCreateStruct;
-use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Wizhippo\Bundle\DeferredVisibilityBundle\Service\DeferredVisibilityService;
+use Symfony\Component\DependencyInjection\ContainerAwareTrait;
+use Wizhippo\WizhippoDeferredVisibilityBundle\Helper\ObjectStateHelper;
+use Wizhippo\WizhippoDeferredVisibilityBundle\Service\DeferredVisibilityService;
 
-class DeferredVisibilityInitCommand extends ContainerAwareCommand
+class DeferredVisibilityInitCommand extends Command
 {
-    protected function configure()
+    use ContainerAwareTrait;
+
+    static $defaultName = 'deferred-visibility:init';
+
+    /**
+     * @var \eZ\Publish\API\Repository\Repository
+     */
+    private $repository;
+
+    public function __construct(Repository $repository)
     {
-        $this->setName("deferred-visibility:init");
+        parent::__construct();
+        $this->repository = $repository;
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $objectStateHelper = $this->getContainer()->get("wizhippo_deferred_visibility_bundle.object_state");
-        $repository = $this->getContainer()->get("ezpublish.api.repository");
-        $objectStateService = $repository->getObjectStateService();
-        $user = $repository->getUserService()->loadUser(14);
-        $repository->setCurrentUser($user);
-        $states = [
-            [DeferredVisibilityService::OBJECT_STATE_NONE, 'None'],
-            [DeferredVisibilityService::OBJECT_STATE_DEFERRED, 'Deferred'],
-            [DeferredVisibilityService::OBJECT_STATE_VISIBLE, 'Visible'],
-            [DeferredVisibilityService::OBJECT_STATE_EXPIRED, 'Expired'],
-        ];
-
-        try {
-            $objectStateGroupDeferred = $objectStateHelper->loadObjectStateGroupByIdentifier(DeferredVisibilityService::OBJECT_STATE_GROUP);
-        } catch (NotFoundException $e) {
-            $objectStateGroupCreateStruct = new ObjectStateGroupCreateStruct();
-            $objectStateGroupCreateStruct->identifier = DeferredVisibilityService::OBJECT_STATE_GROUP;
-            $objectStateGroupCreateStruct->defaultLanguageCode = "eng-GB";
-            $objectStateGroupCreateStruct->names = [
-                "eng-GB" => "Deferred Visibility",
-            ];
-            $objectStateGroupCreateStruct->descriptions = [
-                "eng-GB" => "",
-            ];
-
-            $objectStateGroupDeferred = $objectStateService->createObjectStateGroup($objectStateGroupCreateStruct);
-        }
-
-        if ($output->getVerbosity() >= $output::VERBOSITY_VERBOSE) {
-            $output->writeln("ObjectStateGroup " . DeferredVisibilityService::OBJECT_STATE_GROUP . ": $objectStateGroupDeferred->id");
-        }
-
-        foreach ($states as $state) {
-            try {
-                $objectState = $objectStateHelper->loadObjectStateByIdentifier($objectStateGroupDeferred, $state[0]);
-            } catch (NotFoundException $e) {
-                $objectStateCreateStruct = new ObjectStateCreateStruct();
-                $objectStateCreateStruct->identifier = $state[0];
-                $objectStateCreateStruct->priority = 0;
-                $objectStateCreateStruct->defaultLanguageCode = "eng-GB";
-                $objectStateCreateStruct->names = [
-                    "eng-GB" => $state[1],
-                ];
-                $objectStateCreateStruct->descriptions = [
-                    "eng-GB" => "",
+        $this->repository->sudo(
+            function (Repository $repo) use ($input, $output) {
+                $states = [
+                    ['identifier' => DeferredVisibilityService::OBJECT_STATE_NONE, 'name' => 'None'],
+                    ['identifier' => DeferredVisibilityService::OBJECT_STATE_DEFERRED, 'name' => 'Deferred'],
+                    ['identifier' => DeferredVisibilityService::OBJECT_STATE_VISIBLE, 'name' => 'Visible'],
+                    ['identifier' => DeferredVisibilityService::OBJECT_STATE_EXPIRED, 'name' => 'Expired'],
                 ];
 
-                $objectState = $objectStateService->createObjectState($objectStateGroupDeferred,
-                    $objectStateCreateStruct);
-            }
+                $objectStateService = $repo->getObjectStateService();
+                $objectStateHelper = new ObjectStateHelper($objectStateService);
 
-            if ($output->getVerbosity() >= $output::VERBOSITY_VERBOSE) {
-                $output->writeln("ObjectState {$state[1]}: $objectState->id");
+                try {
+                    $objectStateGroupDeferred = $objectStateHelper->loadObjectStateGroupByIdentifier(DeferredVisibilityService::OBJECT_STATE_GROUP);
+                } catch (NotFoundException $e) {
+                    $objectStateGroupCreateStruct = new ObjectStateGroupCreateStruct();
+                    $objectStateGroupCreateStruct->identifier = DeferredVisibilityService::OBJECT_STATE_GROUP;
+                    $objectStateGroupCreateStruct->defaultLanguageCode = "eng-GB";
+                    $objectStateGroupCreateStruct->names = [
+                        "eng-GB" => "Deferred Visibility",
+                    ];
+                    $objectStateGroupCreateStruct->descriptions = [
+                        "eng-GB" => "",
+                    ];
+
+                    $objectStateGroupDeferred = $objectStateService->createObjectStateGroup($objectStateGroupCreateStruct);
+                }
+
+                if ($output->getVerbosity() >= $output::VERBOSITY_VERBOSE) {
+                    $output->writeln("ObjectStateGroup " . DeferredVisibilityService::OBJECT_STATE_GROUP . ": $objectStateGroupDeferred->id");
+                }
+
+                foreach ($states as $state) {
+                    try {
+                        $objectState = $objectStateHelper->loadObjectStateByIdentifier($objectStateGroupDeferred,
+                            $state['identifier']);
+                    } catch (NotFoundException $e) {
+                        $objectStateCreateStruct = new ObjectStateCreateStruct();
+                        $objectStateCreateStruct->identifier = $state['identifier'];
+                        $objectStateCreateStruct->priority = 0;
+                        $objectStateCreateStruct->defaultLanguageCode = "eng-GB";
+                        $objectStateCreateStruct->names = [
+                            "eng-GB" => $state['name'],
+                        ];
+                        $objectStateCreateStruct->descriptions = [
+                            "eng-GB" => "",
+                        ];
+
+                        $objectState = $objectStateService->createObjectState($objectStateGroupDeferred,
+                            $objectStateCreateStruct);
+                    }
+
+                    if ($output->getVerbosity() >= $output::VERBOSITY_VERBOSE) {
+                        $output->writeln("ObjectState {$state['name']}: $objectState->id");
+                    }
+                }
             }
-        }
+        );
+
+        return self::SUCCESS;
     }
 }
