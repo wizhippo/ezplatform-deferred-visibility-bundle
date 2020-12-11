@@ -8,7 +8,6 @@ use eZ\Publish\API\Repository\Repository;
 use eZ\Publish\API\Repository\Values\Content\Content;
 use eZ\Publish\API\Repository\Values\Content\Query;
 use eZ\Publish\API\Repository\Values\Content\Query\Criterion\Operator;
-use Wizhippo\WizhippoDeferredVisibilityBundle\Helper\ObjectStateHelper;
 
 class DeferredVisibilityService
 {
@@ -35,8 +34,7 @@ class DeferredVisibilityService
     public function __construct(
         Repository $repository,
         array $supportedTypeIds
-    )
-    {
+    ) {
         $this->repository = $repository;
         $this->supportedTypeIds = $supportedTypeIds;
     }
@@ -51,12 +49,11 @@ class DeferredVisibilityService
             function (Repository $repo) use ($content, $now) {
                 $locationService = $repo->getLocationService();
                 $objectStateService = $repo->getObjectStateService();
-                $objectStateHelper = new ObjectStateHelper($objectStateService);
 
                 $now = ($now !== null) ? $now : new \DateTime();
 
                 $locations = $locationService->loadLocations($content->contentInfo);
-                $objectStateGroup = $objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
+                $objectStateGroup = $objectStateService->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
 
                 $expiryDateField = $content->getField(self::FIELD_EXPIRE_VISIBILITY_DATE);
                 $expiryDate = $expiryDateField !== null ? $expiryDateField->value->value : null;
@@ -70,7 +67,7 @@ class DeferredVisibilityService
                             $locationService->hideLocation($location);
                         }
                     }
-                    $expiredObjectState = $objectStateHelper->loadObjectStateByIdentifier(
+                    $expiredObjectState = $objectStateService->loadObjectStateByIdentifier(
                         $objectStateGroup,
                         self::OBJECT_STATE_EXPIRED
                     );
@@ -89,7 +86,7 @@ class DeferredVisibilityService
                             $locationService->hideLocation($location);
                         }
                     }
-                    $deferredObjectState = $objectStateHelper->loadObjectStateByIdentifier(
+                    $deferredObjectState = $objectStateService->loadObjectStateByIdentifier(
                         $objectStateGroup,
                         self::OBJECT_STATE_DEFERRED
                     );
@@ -107,7 +104,7 @@ class DeferredVisibilityService
                         $locationService->unhideLocation($location);
                     }
                 }
-                $visibleObjectState = $objectStateHelper->loadObjectStateByIdentifier(
+                $visibleObjectState = $objectStateService->loadObjectStateByIdentifier(
                     $objectStateGroup,
                     self::OBJECT_STATE_VISIBLE
                 );
@@ -125,16 +122,16 @@ class DeferredVisibilityService
         $this->repository->sudo(
             function (Repository $repo) use ($now) {
                 $searchService = $repo->getSearchService();
-                $objectStateHelper = new ObjectStateHelper($repo->getObjectStateService());
+                $objectStateService = $repo->getObjectStateService();
 
                 $now = ($now !== null) ? $now : new \DateTime();
 
-                $objectStateGroup = $objectStateHelper->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
-                $deferredObjectState = $objectStateHelper->loadObjectStateByIdentifier(
+                $objectStateGroup = $objectStateService->loadObjectStateGroupByIdentifier(self::OBJECT_STATE_GROUP);
+                $deferredObjectState = $objectStateService->loadObjectStateByIdentifier(
                     $objectStateGroup,
                     self::OBJECT_STATE_DEFERRED
                 );
-                $visibleObjectState = $objectStateHelper->loadObjectStateByIdentifier(
+                $visibleObjectState = $objectStateService->loadObjectStateByIdentifier(
                     $objectStateGroup,
                     self::OBJECT_STATE_VISIBLE
                 );

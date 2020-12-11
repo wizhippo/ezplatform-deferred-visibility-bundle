@@ -12,7 +12,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\ContainerAwareTrait;
-use Wizhippo\WizhippoDeferredVisibilityBundle\Helper\ObjectStateHelper;
 use Wizhippo\WizhippoDeferredVisibilityBundle\Service\DeferredVisibilityService;
 
 class DeferredVisibilityInitCommand extends Command
@@ -44,10 +43,11 @@ class DeferredVisibilityInitCommand extends Command
                 ];
 
                 $objectStateService = $repo->getObjectStateService();
-                $objectStateHelper = new ObjectStateHelper($objectStateService);
 
                 try {
-                    $objectStateGroupDeferred = $objectStateHelper->loadObjectStateGroupByIdentifier(DeferredVisibilityService::OBJECT_STATE_GROUP);
+                    $objectStateGroupDeferred = $objectStateService->loadObjectStateGroupByIdentifier(
+                        DeferredVisibilityService::OBJECT_STATE_GROUP
+                    );
                 } catch (NotFoundException $e) {
                     $objectStateGroupCreateStruct = new ObjectStateGroupCreateStruct();
                     $objectStateGroupCreateStruct->identifier = DeferredVisibilityService::OBJECT_STATE_GROUP;
@@ -59,17 +59,23 @@ class DeferredVisibilityInitCommand extends Command
                         "eng-GB" => "",
                     ];
 
-                    $objectStateGroupDeferred = $objectStateService->createObjectStateGroup($objectStateGroupCreateStruct);
+                    $objectStateGroupDeferred = $objectStateService->createObjectStateGroup(
+                        $objectStateGroupCreateStruct
+                    );
                 }
 
                 if ($output->getVerbosity() >= $output::VERBOSITY_VERBOSE) {
-                    $output->writeln("ObjectStateGroup " . DeferredVisibilityService::OBJECT_STATE_GROUP . ": $objectStateGroupDeferred->id");
+                    $output->writeln(
+                        "ObjectStateGroup " . DeferredVisibilityService::OBJECT_STATE_GROUP . ": $objectStateGroupDeferred->id"
+                    );
                 }
 
                 foreach ($states as $state) {
                     try {
-                        $objectState = $objectStateHelper->loadObjectStateByIdentifier($objectStateGroupDeferred,
-                            $state['identifier']);
+                        $objectState = $objectStateService->loadObjectStateByIdentifier(
+                            $objectStateGroupDeferred,
+                            $state['identifier']
+                        );
                     } catch (NotFoundException $e) {
                         $objectStateCreateStruct = new ObjectStateCreateStruct();
                         $objectStateCreateStruct->identifier = $state['identifier'];
@@ -82,8 +88,10 @@ class DeferredVisibilityInitCommand extends Command
                             "eng-GB" => "",
                         ];
 
-                        $objectState = $objectStateService->createObjectState($objectStateGroupDeferred,
-                            $objectStateCreateStruct);
+                        $objectState = $objectStateService->createObjectState(
+                            $objectStateGroupDeferred,
+                            $objectStateCreateStruct
+                        );
                     }
 
                     if ($output->getVerbosity() >= $output::VERBOSITY_VERBOSE) {
